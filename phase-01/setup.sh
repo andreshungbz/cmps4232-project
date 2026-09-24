@@ -64,7 +64,7 @@ create_user() {
 
 # If the effective user ID (EUID) is not 0 (root), exit.
 if [[ $EUID -ne 0 ]]; then
-  echo "[CMPS4232 Project] [ERROR] Script must be run as root or via sudo." >&2
+  log "ERROR" "Script must be run as root or via sudo."
   exit 1
 fi
 

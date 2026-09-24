@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# setup.sh sets up the Phase 1 user hierarchy and directory configuration, creating
+# the necessary groups, provisioning initial user accounts with primary and secondary group assignments,
+# and establishing shared directories with appropriate ownership and permissions.
+
 # Stop execution if script fails since bash continues executing even if a command fails by default.
 # -e exits immediately if a command exits with a non-zero status.
 # -u treats unset variables as an error and exits immediately.

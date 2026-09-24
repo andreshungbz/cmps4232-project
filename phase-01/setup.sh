@@ -41,7 +41,7 @@ log() {
 create_user() {
   local username="$1"
   local primary_group="$2"
-  local secondary_groups="${3:-}"
+  local secondary_groups="${3:-}" # Optional parameter for secondary groups.
   
   if id "$username" &>/dev/null; then
     log "INFO" "User '$username' already exists. Updating primary and secondary groups..."
@@ -76,6 +76,8 @@ groupadd --force developers
 groupadd --force auditors
 
 # Provision user accounts and assign primary and secondary groups.
+# Note that the primary group isn't shown in the /etc/group file, but can be
+# verified with the id command.
 log "INFO" "Creating user accounts..."
 create_user matt sysadmins "developers,auditors"
 create_user alice developers

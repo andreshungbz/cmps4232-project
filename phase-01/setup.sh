@@ -88,8 +88,8 @@ log "INFO" "Creating shared directories..."
 mkdir --parents "$DIR/sysadmins" "$DIR/developers" "$DIR/auditors"
 
 # Apply directory ownership and file permission bits.
-# 2770 maps to rwxrwx---, giving group members read and write access.
-# A Set Group ID (SGID) bit of 2 ensures new files created in the directory inherit directory group ownership.
+# 2770 maps to drwxrws---, giving group members read and write access.
+# A Set Group ID (SGID) bit of 2 (rws) ensures new files created in the directory inherit directory group ownership.
 # Unauthorized users are completely restricted.
 for group in sysadmins developers auditors; do
   target_dir="$DIR/$group"

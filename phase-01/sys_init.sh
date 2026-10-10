@@ -1,12 +1,21 @@
 #!/bin/bash
+
 # sys_init.sh - Interactively provision a project user.
 # Run with: sudo ./sys_init.sh
 
+# Stop execution if script fails since bash continues executing even if a command fails by default.
+# -e exits immediately if a command exits with a non-zero status.
+# -u treats unset variables as an error and exits immediately.
+# -o pipefail causes a pipeline to return the exit status of the first command that fails.
 set -euo pipefail
+
+# VARIABLES
 
 LOG_FILE="/var/log/sys_init.log"
 
-# Record plain-text logs and display color-coded terminal messages.
+# FUNCTIONS
+
+# log records plain-text terminal messages to stdout and a log file.
 log() {
     local level="$1"
     local message="$2"
@@ -45,8 +54,9 @@ log() {
     fi
 }
 
-# Collect and validate the new account's username and primary group.
+# prompt_user_details collects and validates the new account's username and primary group.
 prompt_user_details() {
+    # Account Username Prompt
     while true; do
         log "INFO" "Enter a new username:" prompt
 
@@ -78,6 +88,7 @@ prompt_user_details() {
         break
     done
 
+    # Account Primary Group Prompt
     while true; do
         log "INFO" "Enter the primary group (sysadmins, developers, or auditors):" prompt
 
@@ -103,7 +114,7 @@ prompt_user_details() {
     done
 }
 
-# Return success only when every password requirement is satisfied.
+# validate_password returns success only when every password requirement is satisfied.
 validate_password() {
     # Password policy: At least 8 characters, one lowercase, one uppercase
     # one digit, and one special character.
@@ -116,7 +127,7 @@ validate_password() {
        "$1" =~ [[:punct:]] ]]
 }
 
-# Read the initial password without displaying or logging its contents.
+# prompt_password reads for the initial password without displaying or logging its contents.
 prompt_password() {
     local confirmation
 
@@ -159,7 +170,7 @@ prompt_password() {
     done
 }
 
-# Run a command, log its output streams, and return its exit status.
+# run_logged runs a command, log its output streams, and return its exit status.
 run_logged() {
     local description="$1"
     shift
@@ -192,7 +203,7 @@ run_logged() {
     return "$status"
 }
 
-# Create the account and configure its initial password.
+# create_account makes the account and configure its initial password.
 # Keep the account disabled until shell configuration is complete.
 create_account() {
     if ! run_logged "Creating account '$username'." \
@@ -227,7 +238,7 @@ create_account() {
     log "INFO" "Account '$username' created; shell setup and activation are pending."
 }
 
-# Append project shell settings without replacing the default .bashrc.
+# configure_shell appends project shell settings without replacing the default .bashrc.
 configure_shell() {
     local bashrc="/home/$username/.bashrc"
 
@@ -272,6 +283,8 @@ BASHRC
         exit 1
     fi
 }
+
+# MAIN SCRIPT
 
 # Account creation and writing to /var/log require root privileges.
 if [[ "$EUID" -ne 0 ]]; then

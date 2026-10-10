@@ -39,6 +39,7 @@ log() {
     # Choose color code based on log level.
     case "$level" in
         INFO)  color_code=$'\033[0;34m' ;; # Blue
+        USER)  color_code=$'\033[0;35m' ;; # Purple
         WARN)  color_code=$'\033[0;33m' ;; # Yellow
         ERROR) color_code=$'\033[0;31m' ;; # Red
         *)     color_code="$color_reset" ;;
@@ -63,7 +64,7 @@ log() {
 prompt_user_details() {
     # Username Prompt
     while true; do
-        log "INFO" "Enter a new username:" prompt
+        log "USER" "Enter a new username:" prompt
         if ! IFS= read -r username; then # Preserve input literally by resetting the input-field separator (IFS).
             printf '\n'
             log "ERROR" "Input ended before a username was supplied."
@@ -94,7 +95,7 @@ prompt_user_details() {
 
     # Primary Group Prompt
     while true; do
-        log "INFO" "Enter the primary group (sysadmins, developers, or auditors):" prompt
+        log "USER" "Enter the primary group (sysadmins, developers, or auditors):" prompt
         if ! IFS= read -r primary_group; then
             printf '\n'
             log "ERROR" "Input ended before a primary group was supplied."
@@ -135,7 +136,7 @@ prompt_password() {
     # Initial Password Prompt
     local confirmation
     while true; do
-        log "INFO" "Enter an initial password:" prompt
+        log "USER" "Enter an initial password:" prompt
         if ! IFS= read -r -s password; then
             printf '\n'
             unset password
@@ -152,7 +153,7 @@ prompt_password() {
         fi
 
         # Confirmation Prompt
-        log "INFO" "Enter the password again to confirm:" prompt
+        log "USER" "Enter the password again to confirm:" prompt
         if ! IFS= read -r -s confirmation; then
             printf '\n'
             unset password confirmation

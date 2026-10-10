@@ -60,7 +60,7 @@ log() {
     fi
 }
 
-# prompt_user_details collects and validates the new account's username and primary group.
+# prompt_user_details collects and validates the new account's username, primary group, and optional secondary groups.
 prompt_user_details() {
     # Username Prompt
     while true; do
@@ -116,6 +116,46 @@ prompt_user_details() {
                 log "WARN" "Choose either sysadmins, developers, or auditors."
                 ;;
         esac
+    done
+
+    # Secondary Group Prompt
+    while true; do
+        log "USER" "Enter secondary groups as a comma-separated list (optional):" prompt
+        if ! IFS= read -r secondary_groups_input; then
+            printf '\n'
+            log "ERROR" "Input ended before secondary groups were supplied."
+            exit 1
+        fi
+
+        # Remove all whitespace from the input.
+        secondary_groups="${secondary_groups_input//[[:space:]]/}"
+
+        if [[ -z "$secondary_groups" ]]; then
+            secondary_groups=""
+            break
+        fi
+
+        # Validate the secondary groups.
+        IFS=',' read -ra group_list <<< "$secondary_groups" # Split groups into an array.
+        valid_secondary_groups=true
+        for group_name in "${group_list[@]}"; do
+            # Check for input cases like "developers,,auditors" or "developers,"
+            if [[ -z "$group_name" ]]; then
+                valid_secondary_groups=false
+                break
+            fi
+
+            # Check if the group exists in the system.
+            if ! getent group "$group_name" > /dev/null; then
+                log "WARN" "Secondary group '$group_name' does not exist. Enter valid group names separated by commas."
+                valid_secondary_groups=false
+                break
+            fi
+        done
+
+        if [[ "$valid_secondary_groups" == true ]]; then
+            break
+        fi
     done
 }
 
@@ -210,15 +250,27 @@ run_logged() {
 
 # create_account makes the account and configures its initial password.
 create_account() {
-    # Create the account with the home directory, shell, and primary group. It is initially disabled.
-    if ! run_logged "Creating account '$username'." \
-        useradd -m -d "/home/$username" \
-        -s /bin/bash -g "$primary_group" \
-        -e 1970-01-02 "$username"
-    then
-        unset password
-        log "ERROR" "Account creation failed. Inspect the log before retrying."
-        exit 1
+    # Create the account with the home directory, shell, primary group, and optional secondary groups. It is initially disabled.
+    if [[ -n "$secondary_groups" ]]; then
+        if ! run_logged "Creating account '$username'." \
+            useradd -m -d "/home/$username" \
+            -s /bin/bash -g "$primary_group" -G "$secondary_groups" \
+            -e 1970-01-02 "$username"
+        then
+            unset password
+            log "ERROR" "Account creation failed. Inspect the log before retrying."
+            exit 1
+        fi
+    else
+        if ! run_logged "Creating account '$username'." \
+            useradd -m -d "/home/$username" \
+            -s /bin/bash -g "$primary_group" \
+            -e 1970-01-02 "$username"
+        then
+            unset password
+            log "ERROR" "Account creation failed. Inspect the log before retrying."
+            exit 1
+        fi
     fi
 
     # Set the account's initial password through stdin without logging its value.

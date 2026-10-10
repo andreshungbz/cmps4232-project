@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ====================================================================================
-# setup.sh - Sets up the user hierarchy and directory configuration.
+# setup.sh - Sets up the groups and shared directory configuration.
 # Requires root privileges.
 # ====================================================================================
 
@@ -44,32 +44,6 @@ log() {
     fi
 }
 
-# create_user creates a new user or updates the specified user if it already exists.
-create_user() {
-    local username="$1"
-    local primary_group="$2"
-    local secondary_groups="${3:-}" # Optional parameter for secondary groups.
-    
-    if id "$username" &>/dev/null; then
-        log "INFO" "User '$username' already exists. Updating primary and secondary groups..."
-        # --gid or -g specifies the primary group for the user.
-        usermod --shell "$SHELL" --gid "$primary_group" "$username"
-
-        if [[ -n "$secondary_groups" ]]; then
-            # --append or -a so that existing secondary groups are not removed when adding new ones.
-            # --groups or -G specifies the secondary groups for the user.
-            usermod --append --groups "$secondary_groups" "$username"
-        fi
-    else
-        log "INFO" "Creating user '$username'..."
-        if [[ -n "$secondary_groups" ]]; then
-            useradd --create-home --shell "$SHELL" --gid "$primary_group" --groups "$secondary_groups" "$username"
-        else
-            useradd --create-home --shell "$SHELL" --gid "$primary_group" "$username"
-        fi
-    fi
-}
-
 # ====================================================================================
 # SCRIPT START
 # ====================================================================================
@@ -86,14 +60,6 @@ log "INFO" "Creating secondary groups..."
 groupadd --force sysadmins
 groupadd --force developers
 groupadd --force auditors
-
-# Provision user accounts and assign primary and secondary groups.
-# Note that the primary group isn't shown in the /etc/group file, but can be
-# verified with the id command.
-log "INFO" "Creating user accounts..."
-create_user matt sysadmins "developers,auditors"
-create_user alice developers
-create_user ben auditors "developers"
 
 # Create shared directories for each group.
 log "INFO" "Creating shared directories..."

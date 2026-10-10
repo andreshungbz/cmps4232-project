@@ -1,29 +1,34 @@
 #!/bin/bash
 
-# setup.sh sets up the Phase 1 user hierarchy and directory configuration, creating
-# the necessary groups, provisioning initial user accounts with primary and secondary group assignments,
-# and establishing shared directories with appropriate ownership and permissions.
+# ====================================================================================
+# setup.sh - Sets up the user hierarchy and directory configuration.
+# Requires root privileges.
+# ====================================================================================
 
-# Stop execution if script fails since bash continues executing even if a command fails by default.
 # -e exits immediately if a command exits with a non-zero status.
 # -u treats unset variables as an error and exits immediately.
 # -o pipefail causes a pipeline to return the exit status of the first command that fails.
 set -euo pipefail
 
+# ====================================================================================
 # VARIABLES
+# ====================================================================================
 
 DIR=/srv
 SHELL=/bin/bash
 
+# ====================================================================================
 # FUNCTIONS
+# ====================================================================================
 
-# log prints messages to stdout or stderr based on the log level.
+# log prints messages based on the log level.
 log() {
     local level="$1"
     local message="$2"
-    local color_reset="\033[0m"
-    
     local color_code=""
+    local color_reset="\033[0m"
+
+    # Choose color code based on log level.
     case "$level" in
         INFO) color_code="\033[0;34m";; # Blue
         WARN) color_code="\033[0;33m";; # Yellow
@@ -31,8 +36,8 @@ log() {
         *) color_code="\033[0m";;
     esac
 
+    # Print log to stdout, sending warnings and errors to stderr instead.
     if [[ "$level" == "ERROR" || "$level" == "WARN" ]]; then
-        # Redirect error messages to stderr.
         echo -e "[CMPS4232 Project] [${color_code}${level}${color_reset}] ${message}" >&2
     else
         echo -e "[CMPS4232 Project] [${color_code}${level}${color_reset}] ${message}"
@@ -40,8 +45,6 @@ log() {
 }
 
 # create_user creates a new user or updates the specified user if it already exists.
-# --gid or -g specifies the primary group for the user.
-# --groups or -G specifies the secondary groups for the user.
 create_user() {
     local username="$1"
     local primary_group="$2"
@@ -49,22 +52,27 @@ create_user() {
     
     if id "$username" &>/dev/null; then
         log "INFO" "User '$username' already exists. Updating primary and secondary groups..."
+        # --gid or -g specifies the primary group for the user.
         usermod --shell "$SHELL" --gid "$primary_group" "$username"
+
         if [[ -n "$secondary_groups" ]]; then
-        # --append or -a so that existing secondary groups are not removed when adding new ones.
-        usermod --append --groups "$secondary_groups" "$username"
+            # --append or -a so that existing secondary groups are not removed when adding new ones.
+            # --groups or -G specifies the secondary groups for the user.
+            usermod --append --groups "$secondary_groups" "$username"
         fi
     else
         log "INFO" "Creating user '$username'..."
         if [[ -n "$secondary_groups" ]]; then
-        useradd --create-home --shell "$SHELL" --gid "$primary_group" --groups "$secondary_groups" "$username"
+            useradd --create-home --shell "$SHELL" --gid "$primary_group" --groups "$secondary_groups" "$username"
         else
-        useradd --create-home --shell "$SHELL" --gid "$primary_group" "$username"
+            useradd --create-home --shell "$SHELL" --gid "$primary_group" "$username"
         fi
     fi
 }
 
-# MAIN SCRIPT
+# ====================================================================================
+# SCRIPT START
+# ====================================================================================
 
 # If the effective user ID (EUID) is not 0 (root), exit.
 if [[ $EUID -ne 0 ]]; then

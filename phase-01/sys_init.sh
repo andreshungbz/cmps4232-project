@@ -1,21 +1,26 @@
 #!/bin/bash
 
+# ====================================================================================
 # sys_init.sh - Interactively provision a project user.
-# Run with: sudo ./sys_init.sh
+# Requires root privileges.
+# ====================================================================================
 
-# Stop execution if script fails since bash continues executing even if a command fails by default.
 # -e exits immediately if a command exits with a non-zero status.
 # -u treats unset variables as an error and exits immediately.
 # -o pipefail causes a pipeline to return the exit status of the first command that fails.
 set -euo pipefail
 
+# ====================================================================================
 # VARIABLES
+# ====================================================================================
 
 LOG_FILE="/var/log/sys_init.log"
 
+# ====================================================================================
 # FUNCTIONS
+# ====================================================================================
 
-# log records plain-text terminal messages to stdout and a log file.
+# log prints messages and writes them to a log file.
 log() {
     local level="$1"
     local message="$2"
@@ -24,10 +29,14 @@ log() {
     local color_reset=$'\033[0m'
     local ending=$'\n'
 
-    # Use Belize time and English month names.
+    # Use English month names (LC_ALL) and Belize time zone (TZ).
     timestamp=$(LC_ALL=C TZ="America/Belize" date '+%d %b %Y, %I:%M:%S %p %Z')
 
-    # Color code different types of logs.
+    # Write log to file.
+    printf '[%s] [%s] %s\n' \
+        "$timestamp" "$level" "$message" >> "$LOG_FILE"
+
+    # Choose color code based on log level.
     case "$level" in
         INFO)  color_code=$'\033[0;34m' ;; # Blue
         WARN)  color_code=$'\033[0;33m' ;; # Yellow
@@ -35,16 +44,12 @@ log() {
         *)     color_code="$color_reset" ;;
     esac
 
-    # Keep the saved log readable without terminal color codes.
-    printf '[%s] [%s] %s\n' \
-        "$timestamp" "$level" "$message" >> "$LOG_FILE"
-
     # Prompt mode ends with a space instead of a newline on screen.
     if [[ "${3:-}" == "prompt" ]]; then
         ending=" "
     fi
 
-    # Send warnings and errors to stderr.
+    # Print log to stdout, sending warnings and errors to stderr instead.
     if [[ "$level" == "ERROR" || "$level" == "WARN" ]]; then
         printf '[%s%s%s] %s%s' \
             "$color_code" "$level" "$color_reset" "$message" "$ending" >&2
@@ -56,30 +61,29 @@ log() {
 
 # prompt_user_details collects and validates the new account's username and primary group.
 prompt_user_details() {
-    # Account Username Prompt
+    # Username Prompt
     while true; do
         log "INFO" "Enter a new username:" prompt
-
-        # Preserve input literally, including spaces, so validation can check it.
-        if ! IFS= read -r username; then
+        if ! IFS= read -r username; then # Preserve input literally by resetting the input-field separator (IFS).
             printf '\n'
             log "ERROR" "Input ended before a username was supplied."
             exit 1
         fi
 
-        # Username policy: 1-32 characters, starting with a lowercase letter.
+        # Check username policy: 1-32 characters, starting with a lowercase letter.
         # Remaining characters may be lowercase letters, digits, _ or -.
         if [[ ! "$username" =~ ^[a-z][a-z0-9_-]{0,31}$ ]]; then
             log "WARN" "Use 1-32 characters: only lowercase letters, digits, _ or -."
             continue
         fi
 
+        # Check if the username is already in use.
         if getent passwd "$username" > /dev/null; then
             log "WARN" "That username already exists. Choose another."
             continue
         fi
 
-        # Do not reuse an existing home directory or symbolic link.
+        # Check if the home directory or symbolic link for the username already exists.
         if [[ -e "/home/$username" || -L "/home/$username" ]]; then
             log "WARN" "That home path already exists. Choose another username."
             continue
@@ -88,10 +92,9 @@ prompt_user_details() {
         break
     done
 
-    # Account Primary Group Prompt
+    # Primary Group Prompt
     while true; do
         log "INFO" "Enter the primary group (sysadmins, developers, or auditors):" prompt
-
         if ! IFS= read -r primary_group; then
             printf '\n'
             log "ERROR" "Input ended before a primary group was supplied."
@@ -100,6 +103,7 @@ prompt_user_details() {
 
         case "$primary_group" in
             sysadmins|developers|auditors)
+                # Check if the selected group exists in the system.
                 if getent group "$primary_group" > /dev/null; then
                     break
                 else
@@ -114,26 +118,24 @@ prompt_user_details() {
     done
 }
 
-# validate_password returns success only when every password requirement is satisfied.
+# validate_password checks if a password meets the required criteria.
 validate_password() {
-    # Password policy: At least 8 characters, one lowercase, one uppercase
-    # one digit, and one special character.
+    # Use the C locale to ensure consistent character class behavior across different environments.
     local LC_ALL=C
 
-    [[ "$1" =~ ^.{8,}$ &&
-       "$1" =~ [A-Z] &&
-       "$1" =~ [a-z] &&
-       "$1" =~ [0-9] &&
-       "$1" =~ [[:punct:]] ]]
+    [[ "$1" =~ ^.{8,}$ && # At least 8 characters
+       "$1" =~ [A-Z] && # One uppercase letter
+       "$1" =~ [a-z] && # One lowercase letter
+       "$1" =~ [0-9] && # One digit
+       "$1" =~ [[:punct:]] ]] # One special character
 }
 
 # prompt_password reads for the initial password without displaying or logging its contents.
 prompt_password() {
+    # Initial Password Prompt
     local confirmation
-
     while true; do
         log "INFO" "Enter an initial password:" prompt
-
         if ! IFS= read -r -s password; then
             printf '\n'
             unset password
@@ -142,14 +144,15 @@ prompt_password() {
         fi
         printf '\n'
 
+        # Check if the password meets the required criteria.
         if ! validate_password "$password"; then
             unset password
             log "WARN" "Password must have at least 8 characters with uppercase, lowercase, a digit, and a special character. Try again."
             continue
         fi
 
+        # Confirmation Prompt
         log "INFO" "Enter the password again to confirm:" prompt
-
         if ! IFS= read -r -s confirmation; then
             printf '\n'
             unset password confirmation
@@ -158,6 +161,7 @@ prompt_password() {
         fi
         printf '\n'
 
+        # Check if the password and confirmation match.
         if [[ "$password" != "$confirmation" ]]; then
             unset password confirmation
             log "WARN" "Passwords do not match. Try again."
@@ -170,17 +174,16 @@ prompt_password() {
     done
 }
 
-# run_logged runs a command, log its output streams, and return its exit status.
+# run_logged is a wrapper that runs a command, separately logging stdout and stderr.
 run_logged() {
     local description="$1"
     shift
-
     local status=0
     local line
 
     log "INFO" "$description"
 
-    # Capture normal output and errors separately.
+    # Run command as passed, capturing stdout and stderr in separate files.
     if "$@" > "$LOG_WORK_DIR/stdout" 2> "$LOG_WORK_DIR/stderr"; then
         status=0
     else
@@ -196,6 +199,7 @@ run_logged() {
         log "ERROR" "[STDERR] $line"
     done < "$LOG_WORK_DIR/stderr"
 
+    # Log an error if the command failed.
     if [[ "$status" -ne 0 ]]; then
         log "ERROR" "$description failed (exit status $status)."
     fi
@@ -203,9 +207,9 @@ run_logged() {
     return "$status"
 }
 
-# create_account makes the account and configure its initial password.
-# Keep the account disabled until shell configuration is complete.
+# create_account makes the account and configures its initial password.
 create_account() {
+    # Create the account with the home directory, shell, and primary group. It is initially disabled.
     if ! run_logged "Creating account '$username'." \
         useradd -m -d "/home/$username" \
         -s /bin/bash -g "$primary_group" \
@@ -216,7 +220,7 @@ create_account() {
         exit 1
     fi
 
-    # Supply the password through stdin; do not log its value.
+    # Set the account's initial password through stdin without logging its value.
     if ! printf '%s:%s\n' "$username" "$password" |
         run_logged "Setting the initial password." chpasswd
     then
@@ -225,9 +229,10 @@ create_account() {
         exit 1
     fi
 
+    # Prevent accidental exposure of the password after setting it for the account.
     unset password
 
-    # Done AFTER setting the password, which updates password age.
+    # Set the account to require a password change at first login.
     if ! run_logged "Requiring a password change at first login." \
         chage -d 0 "$username"
     then
@@ -238,10 +243,11 @@ create_account() {
     log "INFO" "Account '$username' created; shell setup and activation are pending."
 }
 
-# configure_shell appends project shell settings without replacing the default .bashrc.
+# configure_shell appends custom aliases and prompt styling to the user's .bashrc profile.
 configure_shell() {
     local bashrc="/home/$username/.bashrc"
 
+    # Apply customized .bashrc template.
     if ! run_logged "Adding aliases and prompt styling." \
         bash -c 'cat >> "$1"' _ "$bashrc" <<'BASHRC'
 
@@ -264,6 +270,7 @@ BASHRC
         exit 1
     fi
 
+    # Set .bashrc ownership.
     if ! run_logged "Setting .bashrc ownership." \
         chown "$username:$primary_group" "$bashrc"
     then
@@ -271,6 +278,7 @@ BASHRC
         exit 1
     fi
 
+    # Set .bashrc permissions.
     if ! run_logged "Setting .bashrc permissions." \
         chmod 644 "$bashrc"
     then
@@ -278,21 +286,24 @@ BASHRC
         exit 1
     fi
 
+    # Validate .bashrc syntax.
     if ! run_logged "Checking .bashrc syntax." bash -n "$bashrc"; then
         log "ERROR" "Shell syntax check failed. The account remains disabled."
         exit 1
     fi
 }
 
-# MAIN SCRIPT
+# ====================================================================================
+# SCRIPT START
+# ====================================================================================
 
-# Account creation and writing to /var/log require root privileges.
+# If the effective user ID (EUID) is not 0 (root), exit.
 if [[ "$EUID" -ne 0 ]]; then
     printf 'ERROR: Run this script with sudo.\n' >&2
     exit 1
 fi
 
-# Restrict newly created files to their owner.
+# Restrict newly created files to their owner for the duration of the script.
 umask 077
 
 # Create the log if needed, preserving previous entries.
@@ -314,14 +325,14 @@ trap 'rm -f -- "$LOG_WORK_DIR/stdout" "$LOG_WORK_DIR/stderr"; rmdir -- "$LOG_WOR
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+# Setup Steps
 log "INFO" "sys_init.sh started."
-
 prompt_user_details
 prompt_password
 create_account
 configure_shell
 
-# Remove account expiration only after every setup step succeeds.
+# Remove account expiration after every setup step succeeds.
 if ! run_logged "Activating account '$username' with primary group '$primary_group'." \
     chage -E -1 "$username"
 then

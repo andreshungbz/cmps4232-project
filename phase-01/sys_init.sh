@@ -177,13 +177,13 @@ prompt_password() {
 # run_logged is a wrapper that runs a command, separately logging stdout and stderr.
 run_logged() {
     local description="$1"
-    shift
     local status=0
     local line
 
     log "INFO" "$description"
 
     # Run command as passed, capturing stdout and stderr in separate files.
+    shift # Shift the description off the argument list, leaving the command and its arguments.
     if "$@" > "$LOG_WORK_DIR/stdout" 2> "$LOG_WORK_DIR/stderr"; then
         status=0
     else

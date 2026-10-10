@@ -1,0 +1,13 @@
+# [CMPS4232 Project] Phase 1: Custom Aliases and Prompt.
+
+# List all files with details and file-type indicators.
+alias ll='ls -alF'
+
+# List files, including hidden ones, except '.' and '..'.
+alias la='ls -A'
+
+# Clear the terminal display.
+alias c='clear'
+
+# Show the username in yellow, @ in white, hostname in blue, and path in green.
+PS1='\[\e[33m\]\u\[\e[37m\]@\[\e[34m\]\h\[\e[0m\]:\[\e[32m\]\w\[\e[0m\]\$ '

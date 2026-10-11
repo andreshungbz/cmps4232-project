@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
+
+# ====================================================================================
+# test_stdout_stderr_logging.sh - Tests correct logging of stdout and stderr messages.
+# ====================================================================================
+
+# -e exits immediately if a command exits with a non-zero status.
+# -u treats unset variables as an error and exits immediately.
+# -o pipefail causes a pipeline to return the exit status of the first command that fails.
 set -euo pipefail
 
+# ====================================================================================
+# SCRIPT START
+# ====================================================================================
+
+# Store the script directory so the test can locate sys_init.sh from any working directory.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# Create a private temporary directory for extracted functions and test output.
 TEST_DIR="$(mktemp -d)"
+
+# Remove all temporary test files when the script exits.
 trap 'rm -rf -- "$TEST_DIR"' EXIT
 
 # Extract only log(), without running the provisioning script.
@@ -18,6 +35,7 @@ bash -n "$TEST_DIR/log_function.sh"
 source "$TEST_DIR/log_function.sh"
 LOG_FILE="$TEST_DIR/sys_init.log"
 
+# check_equal compares two files and reports the result of one logging assertion.
 check_equal() {
     local label="$1"
     local expected="$2"
@@ -31,6 +49,7 @@ check_equal() {
     fi
 }
 
+# Capture each log level to verify which stream receives the message.
 {
     log INFO "info message"
     log USER "user message"
@@ -38,6 +57,7 @@ check_equal() {
     log ERROR "error message"
 } > "$TEST_DIR/stdout" 2> "$TEST_DIR/stderr"
 
+# Define the expected colored output for standard output and standard error.
 printf '[\033[0;34mINFO\033[0m] info message\n[\033[0;35mUSER\033[0m] user message\n' \
     > "$TEST_DIR/expected_stdout"
 
@@ -50,6 +70,7 @@ check_equal "INFO and USER go only to stdout" \
 check_equal "WARN and ERROR go only to stderr" \
     "$TEST_DIR/expected_stderr" "$TEST_DIR/stderr"
 
+# Verify prompt mode prints a trailing space instead of a newline.
 log USER "Enter username:" prompt \
     > "$TEST_DIR/prompt_stdout" 2> "$TEST_DIR/prompt_stderr"
 
@@ -59,13 +80,15 @@ printf '[\033[0;35mUSER\033[0m] Enter username: ' \
 check_equal "Prompt ends with a space and no newline" \
     "$TEST_DIR/expected_prompt" "$TEST_DIR/prompt_stdout"
 
+# Verify prompt mode does not write anything to standard error.
 : > "$TEST_DIR/empty"
 check_equal "USER prompt leaves stderr empty" \
     "$TEST_DIR/empty" "$TEST_DIR/prompt_stderr"
 
-# Remove the timestamp prefix to compare the saved messages.
+# Remove the timestamp prefix so the saved messages can be compared deterministically.
 sed 's/^\[[^]]*\] //' "$LOG_FILE" > "$TEST_DIR/log_messages"
 
+# Define the expected log entries without terminal color escape sequences.
 printf '%s\n' \
     '[INFO] info message' \
     '[USER] user message' \

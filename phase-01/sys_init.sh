@@ -60,7 +60,7 @@ log() {
     fi
 }
 
-# prompt_user_details collects and validates the new account's username, primary group, and optional secondary groups.
+# prompt_user_details collects and validates the new account's username and required secondary groups.
 prompt_user_details() {
     # Username Prompt
     while true; do
@@ -93,34 +93,12 @@ prompt_user_details() {
         break
     done
 
-    # Primary Group Prompt
-    while true; do
-        log "USER" "Enter the primary group (sysadmins, developers, or auditors):" prompt
-        if ! IFS= read -r primary_group; then
-            printf '\n'
-            log "ERROR" "Input ended before a primary group was supplied."
-            exit 1
-        fi
-
-        case "$primary_group" in
-            sysadmins|developers|auditors)
-                # Check if the selected group exists in the system.
-                if getent group "$primary_group" > /dev/null; then
-                    break
-                else
-                    log "ERROR" "The selected project group is missing."
-                    exit 1
-                fi
-                ;;
-            *)
-                log "WARN" "Choose either sysadmins, developers, or auditors."
-                ;;
-        esac
-    done
+    # useradd -U automatically creates a primary group with the same name as the user.
+    primary_group="$username"
 
     # Secondary Group Prompt
     while true; do
-        log "USER" "Enter secondary groups as a comma-separated list (optional):" prompt
+        log "USER" "Enter secondary groups (sysadmins, developers, auditors) as a comma-separated list (at least one required):" prompt
         if ! IFS= read -r secondary_groups_input; then
             printf '\n'
             log "ERROR" "Input ended before secondary groups were supplied."
@@ -131,8 +109,14 @@ prompt_user_details() {
         secondary_groups="${secondary_groups_input//[[:space:]]/}"
 
         if [[ -z "$secondary_groups" ]]; then
-            secondary_groups=""
-            break
+            log "WARN" "Assign at least one secondary group: sysadmins, developers, or auditors."
+            continue
+        fi
+
+        # Reject empty entries, including a trailing comma, before splitting the list.
+        if [[ "$secondary_groups" == ,* || "$secondary_groups" == *, || "$secondary_groups" == *,,* ]]; then
+            log "WARN" "Separate group names with single commas, without empty entries."
+            continue
         fi
 
         # Validate the secondary groups.
@@ -144,6 +128,16 @@ prompt_user_details() {
                 valid_secondary_groups=false
                 break
             fi
+
+            # Only the secondary groups provided in the project instructions are allowed.
+            case "$group_name" in
+                sysadmins|developers|auditors) ;;
+                *)
+                    log "WARN" "Choose only sysadmins, developers, or auditors."
+                    valid_secondary_groups=false
+                    break
+                    ;;
+            esac
 
             # Check if the group exists in the system.
             if ! getent group "$group_name" > /dev/null; then
@@ -250,11 +244,11 @@ run_logged() {
 
 # create_account makes the account and configures its initial password.
 create_account() {
-    # Create the account with the home directory, shell, primary group, and optional secondary groups. It is initially disabled.
+    # Create the account with the home directory, shell, automatic same-name primary group, and required secondary groups. It is initially disabled.
     if [[ -n "$secondary_groups" ]]; then
         if ! run_logged "Creating account '$username'." \
             useradd -m -d "/home/$username" \
-            -s /bin/bash -g "$primary_group" -G "$secondary_groups" \
+            -s /bin/bash -U -G "$secondary_groups" \
             -e 1970-01-02 "$username"
         then
             unset password
@@ -264,7 +258,7 @@ create_account() {
     else
         if ! run_logged "Creating account '$username'." \
             useradd -m -d "/home/$username" \
-            -s /bin/bash -g "$primary_group" \
+            -s /bin/bash -U \
             -e 1970-01-02 "$username"
         then
             unset password

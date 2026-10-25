@@ -29,7 +29,6 @@ export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 # ====================================================================================
 
 # log keeps operational messages separate from the plain-text audit report.
-# log keeps operational messages separate from the plain-text audit report.
 log() {
     local level="$1"
     local message="$2"
@@ -209,7 +208,13 @@ collect_processes() {
         awk -v limit="$TOP_COUNT" '
             BEGIN { printf "%-8s %-32s %8s %14s %s\n", "PID", "USER", "MEM (%)", "RSS (KiB)", "COMMAND" }
             NF >= 5 && $1 ~ /^[0-9]+$/ {
-                if (++seen <= limit) print
+                if (++seen <= limit) {
+                    # Keep command names containing spaces, while formatting
+                    # every row with the same column widths as the headings.
+                    command = $0
+                    sub(/^[[:space:]]*[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "", command)
+                    printf "%-8s %-32s %8s %14s %s\n", $1, $2, $3, $4, command
+                }
             }
             END { if (seen == 0) exit 1 }
         ' > "$WORK_DIR/processes"

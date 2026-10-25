@@ -1,0 +1,2 @@
+# Run the authentication audit daily at midnight; append stdout and stderr to one log.
+0 0 * * * /usr/local/sbin/log_analyzer.sh >> /var/log/log_analyzer.log 2>&1

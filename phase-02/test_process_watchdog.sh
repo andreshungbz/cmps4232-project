@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
-# ====================================================================================
+# =====================================================================================
 # test_process_watchdog.sh - Test monitoring decisions without changing real processes.
-# Place beside process_watchdog.sh. Run with bash; no sudo is needed.
-# Linux /proc integration is verified separately on the Ubuntu project server.
-# ====================================================================================
+# Needs to be in the same directory as process_watchdog.sh. No sudo required.
+# =====================================================================================
 
 # Exit on unhandled failures, unset variables, or failures within pipelines.
 set -euo pipefail

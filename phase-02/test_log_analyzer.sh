@@ -2,7 +2,8 @@
 
 # ====================================================================================
 # test_log_analyzer.sh - Tests the analyzer with temporary sample authentication logs.
-# Place beside log_analyzer.sh. No sudo required; real logs/reports are not changed.
+# Needs to be placed in the same directory as log_analyzer.sh.
+# No sudo required; real logs/reports are not changed.
 # ====================================================================================
 
 # Exit on unhandled failures, unset variables, or failures within pipelines.

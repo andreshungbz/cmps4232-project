@@ -2,7 +2,7 @@
 
 # ====================================================================================
 # process_watchdog.sh - Monitor selected Ubuntu processes and control excessive usage.
-# Example: bash process_watchdog.sh --pids 1234,5678 --log ./watchdog.log 
+# Example: sudo ./process_watchdog.sh --pids 1234,5678 --log ./watchdog.log 
 # Run with sufficient permissions for the selected processes and log destination.
 # ====================================================================================
 

@@ -1,0 +1,8 @@
+# Exclude everything except the files required to build this image.
+**
+!Dockerfile
+!.dockerignore
+!nginx/
+!nginx/default.conf.template
+!html/
+!html/index.html

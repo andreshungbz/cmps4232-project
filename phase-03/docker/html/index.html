@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Systems Administration Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 2rem;
+            background: #f3f5f7;
+            color: #172b3a;
+            font-family: system-ui, sans-serif;
+            line-height: 1.6;
+        }
+
+        main {
+            max-width: 48rem;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: white;
+            border: 1px solid #d5dde3;
+            border-radius: 0.75rem;
+        }
+
+        h1 { line-height: 1.2; }
+        a { color: #005ea8; }
+        code { overflow-wrap: anywhere; }
+        .note { color: #485967; }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Systems Administration Dashboard</h1>
+        <p>CMPS4232 · Phase 3 · Ubuntu Server</p>
+
+        <h2>Network diagnostics</h2>
+        <p>
+            <a href="/metrics/net_status.html">View network diagnostic reports</a>
+        </p>
+        <p class="note">
+            Reports become available after net_check.sh runs on the Ubuntu host.
+            Before the first report is generated, the report link returns 404.
+            Check each report's timestamp to determine its age.
+        </p>
+
+        <h2>Web service check</h2>
+        <p><a href="/health">Check the NGINX response</a></p>
+        <p class="note">
+            This checks the web service only. It does not verify external
+            connectivity or the freshness of diagnostic reports.
+        </p>
+
+        <h2>Persistent reports</h2>
+        <p>
+            Reports are stored on the Ubuntu host in
+            <code>/srv/health-dashboard/metrics</code>
+            and served through a read-only container mount.
+        </p>
+    </main>
+</body>
+</html>

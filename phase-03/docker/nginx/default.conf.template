@@ -1,0 +1,37 @@
+# ====================================================================================
+# default.conf.template - Serve the dashboard and host-generated diagnostic reports.
+# The container entrypoint replaces ${NGINX_PORT} before NGINX starts.
+# ====================================================================================
+
+server {
+    listen ${NGINX_PORT};
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Hide the NGINX version in responses.
+    server_tokens off;
+
+    # Serve existing dashboard files; return 404 for missing paths.
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # Reports come from the read-only host directory mount.
+    location /metrics/ {
+        autoindex off;
+        default_type text/html;
+
+        # Ask browsers to retrieve fresh diagnostic results.
+        add_header Cache-Control "no-store" always;
+
+        try_files $uri =404;
+    }
+
+    # This endpoint checks the web service, independently of diagnostic reports.
+    location = /health {
+        default_type text/plain;
+        return 200 "OK\n";
+    }
+}

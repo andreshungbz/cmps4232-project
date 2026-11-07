@@ -1,0 +1,99 @@
+# ====================================================================================
+# justfile - Build, deploy, and demonstrate the Phase 3 Docker dashboard.
+# Run on the Ubuntu Server. Use "just" to list available commands.
+# ====================================================================================
+
+# Use Bash for recipes, regardless of the interactive terminal's shell.
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# ====================================================================================
+# DEPLOYMENT SETTINGS
+# ====================================================================================
+
+image := "health-dashboard:1.0"
+container := "health-dashboard"
+host_port := "8080"
+memory := "128m"
+metrics_dir := "/srv/health-dashboard/metrics"
+metrics_target := "/usr/share/nginx/html/metrics"
+base_url := "http://127.0.0.1:" + host_port
+
+# Docker templates are stored as strings to avoid Just interpolation conflicts.
+settings_format := 'Memory={{.HostConfig.Memory}} Restart={{.HostConfig.RestartPolicy.Name}}'
+mount_format := '{{range .Mounts}}Source={{.Source}} Destination={{.Destination}} Writable={{.RW}}{{println}}{{end}}'
+
+# ====================================================================================
+# BUILD AND DEPLOYMENT
+# ====================================================================================
+
+# List available recipes without changing the server.
+default:
+    just --list
+
+# Build the image with readable output suitable for screenshots.
+build:
+    sudo docker build --progress=plain -t "{{image}}" ./docker
+
+# Create a new container. An existing container with this name causes an error.
+start:
+    test -d "{{metrics_dir}}" || { printf 'ERROR: Missing host metrics directory.\n' >&2; exit 1; }
+    sudo docker run -d \
+        --name "{{container}}" \
+        --publish "127.0.0.1:{{host_port}}:80" \
+        --env NGINX_PORT=80 \
+        --memory "{{memory}}" \
+        --restart unless-stopped \
+        --mount "type=bind,source={{metrics_dir}},target={{metrics_target}},readonly" \
+        "{{image}}"
+
+# Start an existing stopped container without changing its configuration.
+resume:
+    sudo docker start "{{container}}"
+
+# Display this container, including when it is stopped.
+status:
+    sudo docker ps -a --filter "name=^/{{container}}$"
+
+# ====================================================================================
+# VERIFICATION AND EVIDENCE
+# ====================================================================================
+
+# Display applied resource controls, restart policy, mount, and port bindings.
+settings:
+    sudo docker inspect --format '{{settings_format}}' "{{container}}"
+    sudo docker inspect --format '{{mount_format}}' "{{container}}"
+    sudo docker port "{{container}}"
+
+# Validate NGINX and check HTTP responses; display settings for rubric review.
+verify: settings
+    sudo docker exec "{{container}}" nginx -t
+    curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 1 "{{base_url}}/health"
+    curl --fail --silent --show-error --output /dev/null --write-out 'Dashboard HTTP status: %{http_code}\n' "{{base_url}}/"
+
+# Display the rendered configuration to verify environment substitution.
+config:
+    sudo docker exec "{{container}}" cat /etc/nginx/conf.d/default.conf
+
+# Retrieve the existing test file; this recipe never creates or rewrites it.
+persistence:
+    curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 1 "{{base_url}}/metrics/persistence-test.html"
+
+# Display recent logs without continuously following them.
+logs:
+    sudo docker logs --tail 50 "{{container}}"
+
+# ====================================================================================
+# EXPLICIT LIFECYCLE OPERATIONS
+# ====================================================================================
+
+# Restart the container without replacing it.
+restart:
+    sudo docker restart "{{container}}"
+
+# Stop the container gracefully.
+stop:
+    sudo docker stop "{{container}}"
+
+# Remove a stopped container. The host report directory is preserved.
+remove:
+    sudo docker rm "{{container}}"

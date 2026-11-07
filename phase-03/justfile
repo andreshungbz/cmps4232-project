@@ -83,6 +83,28 @@ logs:
     sudo docker logs --tail 50 "{{container}}"
 
 # ====================================================================================
+# NETWORK DIAGNOSTICS - append these recipes to the existing phase-03/justfile.
+# Uses the existing base_url variable. Commands stay visible for later screenshots.
+# ====================================================================================
+
+# Check syntax and run isolated tests without sudo or live network requests.
+net-test:
+    bash -n ./net_check.sh
+    bash -n ./test_net_check.sh
+    bash ./test_net_check.sh
+
+# Run diagnostics. Exit 1 means findings were published; exit 2 remains a failure.
+net-check:
+    rc=0; sudo bash ./net_check.sh || rc=$?; if [ "$rc" -eq 1 ]; then printf 'Report published with failed checks; review net-report.\n'; elif [ "$rc" -ne 0 ]; then exit "$rc"; fi
+
+# Display the published report at the address required for the live demonstration.
+net-report:
+    curl --fail --silent --show-error "{{base_url}}/metrics/net_status.html"
+
+# Run diagnostics and retrieve the report, ready for later screenshot capture.
+net-demo: net-check net-report
+
+# ====================================================================================
 # EXPLICIT LIFECYCLE OPERATIONS
 # ====================================================================================
 

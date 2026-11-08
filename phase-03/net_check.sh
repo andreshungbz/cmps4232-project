@@ -16,6 +16,10 @@ export PATH=/usr/sbin:/usr/bin:/sbin:/bin
 # VARIABLES
 # ====================================================================================
 
+# Resolve presentation files relative to this script, not the caller's directory.
+NET_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+REPORT_TEMPLATE="$NET_SCRIPT_DIR/templates/net-report-header.html"
+
 CONTAINER=health-dashboard
 OUTPUT=/srv/health-dashboard/metrics/net_status.html
 HOST=example.com
@@ -136,7 +140,7 @@ prepare_output() {
 
     local name parent owner mode
 
-    for name in bash ip ss docker getent ping curl timeout flock stat mktemp sed head tail chmod mv date dirname basename cat rm; do
+    for name in awk bash ip ss docker getent ping curl timeout flock stat mktemp sed head tail chmod mv date dirname basename cat rm; do
         command -v "$name" >/dev/null || die "Required command '$name' is unavailable."
     done
 
@@ -164,6 +168,24 @@ prepare_output() {
     WORK_DIR=$(mktemp -d "$parent/.net_check.XXXXXX")
 }
 
+# Display arguments with readable shell quotes; execution still uses the original array.
+format_command() {
+    local arg separator='' quoted
+
+    for arg in "$@"; do
+        printf '%s' "$separator"
+        case "$arg" in
+            ''|*[!a-zA-Z0-9_./:=,@%+-]*)
+                # A literal apostrophe closes the quote, escapes itself, and reopens it.
+                quoted=${arg//\'/\'\\\'\'}
+                printf "'%s'" "$quoted"
+                ;;
+            *) printf '%s' "$arg" ;;
+        esac
+        separator=' '
+    done
+}
+
 # Record failures and continue collecting other checks. Every command is bounded.
 run_check() {
     local title="$1" status=PASS rc=0
@@ -181,59 +203,93 @@ run_check() {
     fi
 
     {
-        printf '<h3>%s — %s</h3>\n' "$title" "$status"
+        printf '<details class="check" data-result="%s"%s><summary>%s - %s</summary>\n' "$status" "$([[ $status == FAIL ]] && printf ' open')" "$title" "$status"
         printf '<p>Command: <code>'
-        printf '%q ' "$@" | html_escape
-        printf '</code> · Exit: %s</p><pre>\n' "$rc"
+        format_command "$@" | html_escape
+        printf '</code> ∙ Exit: %s</p><pre>\n' "$rc"
         if [[ -s "$WORK_DIR/check" ]]; then html_escape < "$WORK_DIR/check"; else printf '(No output)\n'; fi
-        printf '</pre>\n'
+        printf '</pre></details>\n'
     } >> "$WORK_DIR/section"
 }
 
 # Collect host and container diagnostics into a timestamped report section.
 collect_checks() {
-    printf '<section><h2>Run: %s</h2>\n' "$(date '+%d %b %Y, %I:%M:%S %p %Z')" > "$WORK_DIR/section"
+    local token_file report_id timestamp label
 
-    run_check 'Interface addresses and state' ip -brief address show
-    run_check 'Active interface counters (cumulative)' ip -s link show up
+    # Reserve a unique token even when multiple reports start in the same second.
+    token_file=$(mktemp "$WORK_DIR/run.XXXXXXXXXXXX")
+    report_id="report-${token_file##*.}"
+    timestamp=$(date '+%Y-%m-%dT%H:%M:%S%z')
+    label=$(date '+%d %b %Y, %I:%M:%S %p %Z')
 
-    run_check 'IPv4 routes and gateways' ip -4 route show
-    run_check 'IPv6 routes and gateways' ip -6 route show
+    printf '<section class="report-entry" id="%s" data-report-version="2" data-timestamp="%s"><h2>Run: %s</h2>\n' \
+        "$report_id" "$timestamp" "$label" > "$WORK_DIR/section"
 
-    run_check 'DNS resolver configuration' resolvectl status
 
-    run_check 'TCP listeners and unconnected UDP sockets' ss -lntup
+    printf '<div class="check-group"><h3>Active Interface Statistics</h3>\n' >> "$WORK_DIR/section"
+    run_check 'Interface Addresses' ip -brief address show
+    run_check 'Interface Traffic' ip -s link show up
+    run_check 'IPv4 Routes' ip -4 route show
+    run_check 'IPv6 Routes' ip -6 route show
+    printf '</div>\n' >> "$WORK_DIR/section"
 
-    run_check 'Container state' docker inspect --type container --format '{{.State.Status}}' "$CONTAINER"
-    run_check 'Container must be running' bash -c 'state=$(docker inspect --type container --format "{{.State.Running}}" "$1") && test "$state" = true' _ "$CONTAINER"
-    run_check 'Configured container port bindings' docker inspect --type container --format '{{json .HostConfig.PortBindings}}' "$CONTAINER"
-    run_check 'Published container ports' docker port "$CONTAINER"
+    printf '<div class="check-group"><h3>DNS Resolution</h3>\n' >> "$WORK_DIR/section"
+    run_check 'DNS Configuration' resolvectl status
+    run_check 'Hostname Lookup' getent ahosts "$HOST"
+    run_check 'Domain Reachability' ping -n -c 2 -W 2 "$HOST"
+    printf '</div>\n' >> "$WORK_DIR/section"
 
-    run_check 'Numeric IPv4 ICMP response (independent of DNS)' ping -4 -n -c 2 -W 2 "$IP_TARGET"
+    printf '<div class="check-group"><h3>Listening Ports</h3>\n' >> "$WORK_DIR/section"
+    run_check 'Active Network Sockets' ss -lntup
+    printf '</div>\n' >> "$WORK_DIR/section"
 
-    run_check 'Hostname resolution (system resolver)' getent ahosts "$HOST"
-    run_check 'ICMP response (may be filtered independently of HTTPS)' ping -n -c 2 -W 2 "$HOST"
+    printf '<div class="check-group"><h3>Container Port Bindings</h3>\n' >> "$WORK_DIR/section"
+    run_check 'Container State' docker inspect --type container --format '{{.State.Status}}' "$CONTAINER"
+    run_check 'Container Running Flag' docker inspect --type container --format '{{.State.Running}}' "$CONTAINER"
+    run_check 'Published Ports' docker port "$CONTAINER"
+    printf '</div>\n' >> "$WORK_DIR/section"
 
-    run_check 'HTTPS response (HTTP errors count as failures)' curl --disable --noproxy '*' --proto '=https' --fail --silent --show-error --connect-timeout "$TIMEOUT" --max-time "$TIMEOUT" --output /dev/null --write-out 'HTTP=%{http_code} Remote=%{remote_ip} Total=%{time_total}s\n' "$URL"
+    printf '<div class="check-group"><h3>External Host Connectivity</h3>\n' >> "$WORK_DIR/section"
+    run_check 'IPv4 Reachability' ping -4 -n -c 2 -W 2 "$IP_TARGET"
+    run_check 'HTTPS Reachability' curl -q --noproxy '*' -fsS -m "$TIMEOUT" -o /dev/null -w 'HTTP=%{http_code} Remote=%{remote_ip} Total=%{time_total}s\n' "$URL"
+    printf '</div>\n' >> "$WORK_DIR/section"
 
-    printf '<p>Checks: %s; failed: %s. PASS means the named command succeeded, not that every reported metric is healthy.</p></section>\n' "$CHECK_NUMBER" "$FAILED" >> "$WORK_DIR/section"
+    printf '<p class="report-summary" data-checks="%s" data-failed="%s">Checks: %s, Failed: %s. PASS means the named command succeeded, not that every reported metric is healthy.</p></section>\n' "$CHECK_NUMBER" "$FAILED" "$CHECK_NUMBER" "$FAILED" >> "$WORK_DIR/section"
+}
+
+# Copy static presentation markup as data; never execute or expand the template.
+write_report_header() {
+    [[ -f "$REPORT_TEMPLATE" && -r "$REPORT_TEMPLATE" ]] || die "Cannot read report template: $REPORT_TEMPLATE"
+
+    # This is a document prefix: closing the page here strands appended reports.
+    if ! awk 'tolower($0) ~ /<\/[[:space:]]*(main|body|html)[[:space:]]*>/ { invalid = 1 } END { exit invalid }' "$REPORT_TEMPLATE"; then
+        die 'Report header must not close main, body, or html; remove those closing tags from the template.'
+    fi
+
+    printf '%s\n' "$MARKER"
+    cat -- "$REPORT_TEMPLATE"
 }
 
 # Preserve report history and atomically publish the completed HTML document.
 publish_report() {
+    # Always use the current presentation, even when history already exists.
+    write_report_header > "$WORK_DIR/report" || die 'Cannot create report header.'
+
     if [[ -e "$OUTPUT" ]]; then
-        # Remove only our closing line so new sections remain inside the document.
-        sed '$d' "$OUTPUT" > "$WORK_DIR/report"
-    else
-        cat > "$WORK_DIR/report" <<HTML
-$MARKER
-<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Network diagnostic history</title>
-<style>body{font-family:system-ui,sans-serif;margin:2rem;color:#172b3a}main{max-width:75rem;margin:auto}section{border-top:2px solid #ccd5dd;margin-top:2rem}pre{background:#f3f5f7;padding:1rem;overflow:auto}code{overflow-wrap:anywhere}</style>
-</head><body><main><h1>Network diagnostic history</h1>
-<p>Ubuntu host measurements, oldest first. Check timestamps for freshness. Interface counters are cumulative. Failed ICMP does not by itself establish an Internet outage. HTTPS uses a direct connection without a proxy.</p>
-HTML
+        [[ "$(head -n 1 -- "$OUTPUT")" == "$MARKER" && "$(tail -n 1 -- "$OUTPUT")" == "$FOOTER" ]] || die 'Existing report format is unrecognized; previous report preserved.'
+
+        # Generated history starts at a section on its own line. Diagnostic text
+        # is HTML-escaped, so it cannot be mistaken for this document boundary.
+        # Retain every history line, dropping only the final document footer.
+        awk -v footer="$FOOTER" '
+            /^<section([ >])/ { copying = 1 }
+            copying {
+                if (have_line) print previous
+                previous = $0
+                have_line = 1
+            }
+            END { if (!copying || previous != footer) exit 1 }
+        ' "$OUTPUT" >> "$WORK_DIR/report" || die 'Cannot identify existing history; previous report preserved.'
     fi
 
     cat "$WORK_DIR/section" >> "$WORK_DIR/report"

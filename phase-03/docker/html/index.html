@@ -1,62 +1,415 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Systems Administration Dashboard</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 2rem;
-            background: #f3f5f7;
-            color: #172b3a;
-            font-family: system-ui, sans-serif;
-            line-height: 1.6;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Internal Dashboard</title>
 
-        main {
-            max-width: 48rem;
-            margin: 2rem auto;
-            padding: 2rem;
-            background: white;
-            border: 1px solid #d5dde3;
-            border-radius: 0.75rem;
-        }
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #192c33;
+      --muted: #617179;
+      --line: #dfe7e7;
+      --accent: #167c75;
+      --wash: #f5f8f7;
+    }
 
-        h1 { line-height: 1.2; }
-        a { color: #005ea8; }
-        code { overflow-wrap: anywhere; }
-        .note { color: #485967; }
-    </style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #fff;
+      color: var(--ink);
+      font: 15px/1.65 system-ui, -apple-system, sans-serif;
+    }
+
+    main {
+      max-width: 1120px;
+      margin: auto;
+      padding: 32px 36px 64px;
+    }
+
+    a {
+      color: var(--accent);
+      text-underline-offset: 4px;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      font-size: x-large;
+      font-weight: 700;
+      letter-spacing: -.03em;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    h1 {
+      font-size: clamp(30px, 5vw, 48px);
+      letter-spacing: -.045em;
+      line-height: 1.15;
+      margin: 14px 0 20px;
+      font-weight: 650;
+    }
+
+    h2 { font-size: 21px; letter-spacing: -.025em; }
+    h3 { font-size: 16px; }
+
+    .hero { padding: 48px 0 32px; }
+    .muted, .note { color: var(--muted); }
+    .hero p { max-width: 640px; }
+
+    .button, button {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 10px 16px;
+      background: white;
+      font: inherit;
+      cursor: pointer;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: .6;
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    select:focus-visible,
+    summary:focus-visible {
+      outline: 3px solid #67bdb4;
+      outline-offset: 4px;
+    }
+
+    .service {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 12px;
+    }
+
+    .service button {
+      font-size: 12px;
+      padding: 5px 10px;
+    }
+
+    .status { color: var(--muted); }
+    .status[data-state=ok] { color: #16734c; }
+    .status[data-state=error] { color: #aa3f35; }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 26px;
+      margin-bottom: 24px;
+    }
+
+    .panel h2 { margin-top: 0; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--line);
+      margin-top: 24px;
+    }
+
+    .metric { padding: 20px 0; }
+
+    .metric + .metric {
+      padding-left: 24px;
+      border-left: 1px solid var(--line);
+    }
+
+    .metric small { display: block; color: var(--muted); }
+
+    .metric strong {
+      display: block;
+      font-size: 27px;
+      font-weight: 550;
+      letter-spacing: -.04em;
+    }
+
+    footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    footer details { margin-top: 12px; }
+    summary { cursor: pointer; }
+
+    code {
+      font: 12px/1.6 ui-monospace, monospace;
+      overflow-wrap: anywhere;
+    }
+
+    #report-controls {
+      padding: 22px 24px;
+      background: var(--wash);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-bottom: 30px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 650;
+      margin-bottom: 8px;
+    }
+
+    select {
+      width: 100%;
+      max-width: 100%;
+      font: inherit;
+      color: var(--ink);
+      background: white;
+      border: 1px solid #c9d6d5;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    #report-selection-summary {
+      font-size: 13px;
+      margin-bottom: 0;
+      color: var(--muted);
+    }
+
+    .report-entry > h2 {
+      font-size: 17px;
+      color: var(--muted);
+      font-weight: 500;
+      margin: 28px 0 20px;
+    }
+
+    .check {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin: 12px 0;
+      padding: 16px 20px;
+    }
+
+    .check summary {
+      font-weight: 550;
+      list-style-position: outside;
+      margin-left: 16px;
+    }
+
+    .check > p {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .check[data-result=FAIL] { border-left: 3px solid #bd6057; }
+    .check[data-result=PASS] { border-left: 3px solid #72a79b; }
+
+    pre {
+      background: var(--wash);
+      padding: 16px;
+      border-radius: 5px;
+      overflow: auto;
+      font: 12px/1.7 ui-monospace, monospace;
+      white-space: pre;
+      max-height: 450px;
+    }
+
+    .report-summary {
+      font-size: 13px;
+      color: var(--muted);
+      padding-top: 20px;
+    }
+
+    .section-note {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    [hidden] { display: none !important; }
+
+    @media (max-width: 600px) {
+      main { padding: 20px 18px 40px; }
+
+      nav {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .hero { padding-top: 30px; }
+      .panel { padding: 20px; }
+
+      .metrics { grid-template-columns: 1fr; }
+
+      .metric { padding: 12px 0; }
+
+      .metric + .metric {
+        padding-left: 0;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .check { padding: 14px; }
+      #report-controls { padding: 18px; }
+    }
+
+    @media print {
+      [hidden] { display: block !important; }
+      #report-controls { display: none !important; }
+
+      pre {
+        max-height: none;
+        white-space: pre-wrap;
+      }
+    }
+  </style>
 </head>
 <body>
-    <main>
-        <h1>Systems Administration Dashboard</h1>
-        <p>CMPS4232 · Phase 3 · Ubuntu Server</p>
+<main>
 
-        <h2>Network diagnostics</h2>
-        <p>
-            <a href="/metrics/net_status.html">View network diagnostic reports</a>
-        </p>
-        <p class="note">
-            Reports become available after net_check.sh runs on the Ubuntu host.
-            Before the first report is generated, the report link returns 404.
-            Check each report's timestamp to determine its age.
-        </p>
+  <nav>
+    <a class="brand" href="/">Internal Dashboard</a>
+    <div class="service">
+      <span id="service-status" class="status" role="status">Web Service: Not Checked</span>
+      <button id="check-service" type="button">Check Again</button>
+    </div>
+  </nav>
 
-        <h2>Web service check</h2>
-        <p><a href="/health">Check the NGINX response</a></p>
-        <p class="note">
-            This checks the web service only. It does not verify external
-            connectivity or the freshness of diagnostic reports.
-        </p>
+  <header class="hero">
+    <div class="eyebrow">CMPS4232 Semester Project</div>
+    <h1>Your server.<br>A clearer perspective.</h1>
+    <p class="muted">Network diagnostics collected on Ubuntu, preserved across container restarts, and ready to inspect.</p>
+    <a class="button primary" href="/metrics/net_status.html">Explore Network Reports →</a>
+  </header>
 
-        <h2>Persistent reports</h2>
-        <p>
-            Reports are stored on the Ubuntu host in
-            <code>/srv/health-dashboard/metrics</code>
-            and served through a read-only container mount.
-        </p>
-    </main>
+  <div class="panel">
+    <div class="eyebrow">Latest recorded run</div>
+    <h2 id="latest-title">Loading report history…</h2>
+    <p id="latest-note" class="muted" role="status">Retrieving the most recent diagnostic summary.</p>
+
+    <div class="metrics">
+      <div class="metric">
+        <small>Checks Passed</small>
+        <strong id="latest-passed">—</strong>
+      </div>
+      <div class="metric">
+        <small>Checks Failed</small>
+        <strong id="latest-failed">—</strong>
+      </div>
+      <div class="metric">
+        <small>Reports Retained</small>
+        <strong id="report-count">—</strong>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Persistent History · Served by NGINX</span>
+    <details>
+      <summary>Storage & Service Details</summary>
+      <p>Reports are stored at <code>/srv/health-dashboard/metrics</code> and served through a read-only container mount. The web service check tests <a href="/health">/health</a>; it does not verify external connectivity or report freshness.</p>
+    </details>
+  </footer>
+
+  <noscript>
+    <p>JavaScript is disabled. <a href="/metrics/net_status.html">Read the report history</a> or <a href="/health">check the web service</a> directly.</p>
+  </noscript>
+
+</main>
+
+<script>
+  const status = document.getElementById('service-status');
+  const button = document.getElementById('check-service');
+
+  async function checkService() {
+    button.disabled = true;
+    status.dataset.state = '';
+    status.textContent = 'Checking…';
+    try {
+      const response = await fetch('/health', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+      if (!response.ok || (await response.text()).trim() !== 'OK') throw new Error();
+      status.dataset.state = 'ok';
+      status.textContent = `Checked ${new Date().toLocaleTimeString()}`;
+    } catch (_) {
+      status.dataset.state = 'error';
+      status.textContent = 'Check Unavailable';
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  button.addEventListener('click', checkService);
+  checkService();
+
+  async function loadLatest() {
+    const title = document.getElementById('latest-title');
+    const note = document.getElementById('latest-note');
+    try {
+      const response = await fetch('/metrics/net_status.html', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+
+      if (response.status === 404) {
+        title.textContent = 'No reports yet';
+        note.textContent = 'Run net_check.sh on Ubuntu to create the first report.';
+        return;
+      }
+
+      if (!response.ok) throw new Error();
+
+      const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+      const reports = Array.from(doc.querySelectorAll('main > section'));
+      if (!reports.length) throw new Error();
+
+      const latest = reports[reports.length - 1];
+      title.textContent = latest.querySelector('h2')?.textContent.replace(/^Run:\s*/, '') || 'Latest report';
+      document.getElementById('report-count').textContent = reports.length;
+
+      const result = latest.querySelector('.report-summary');
+      const count = Number(result?.dataset.checks);
+      const failed = Number(result?.dataset.failed);
+
+      if (!result || !Number.isInteger(count) || !Number.isInteger(failed) || count < 0 || failed < 0 || failed > count) {
+        note.textContent = 'Earlier report format. Open the report to inspect its results.';
+        return;
+      }
+
+      document.getElementById('latest-passed').textContent = count - failed;
+      document.getElementById('latest-failed').textContent = failed;
+      note.textContent = 'Results from this recorded run. Check the timestamp for freshness; reload this page after generating new reports.';
+    } catch (_) {
+      title.textContent = 'Report Summary Unavailable';
+      note.textContent = 'Try reloading or open the report history directly.';
+    }
+  }
+
+  loadLatest();
+</script>
 </body>
 </html>

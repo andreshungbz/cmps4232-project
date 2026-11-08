@@ -55,6 +55,22 @@ status:
     sudo docker ps -a --filter "name=^/{{container}}$"
 
 # ====================================================================================
+# EXPLICIT LIFECYCLE OPERATIONS
+# ====================================================================================
+
+# Restart the container without replacing it.
+restart:
+    sudo docker restart "{{container}}"
+
+# Stop the container gracefully.
+stop:
+    sudo docker stop "{{container}}"
+
+# Remove a stopped container. The host report directory is preserved.
+remove:
+    sudo docker rm "{{container}}"
+
+# ====================================================================================
 # VERIFICATION AND EVIDENCE
 # ====================================================================================
 
@@ -83,8 +99,7 @@ logs:
     sudo docker logs --tail 50 "{{container}}"
 
 # ====================================================================================
-# NETWORK DIAGNOSTICS - append these recipes to the existing phase-03/justfile.
-# Uses the existing base_url variable. Commands stay visible for later screenshots.
+# NETWORK DIAGNOSTICS
 # ====================================================================================
 
 # Check syntax and run isolated tests without sudo or live network requests.
@@ -105,17 +120,30 @@ net-report:
 net-demo: net-check net-report
 
 # ====================================================================================
-# EXPLICIT LIFECYCLE OPERATIONS
+# BACKUP RECIPES
 # ====================================================================================
 
-# Restart the container without replacing it.
-restart:
-    sudo docker restart "{{container}}"
+# Check syntax and test isolated sample files; no sudo required.
+backup-test:
+    bash -n ./sys_backup.sh
+    bash -n ./test_sys_backup.sh
+    bash ./test_sys_backup.sh
 
-# Stop the container gracefully.
-stop:
-    sudo docker stop "{{container}}"
+# Create and verify a backup. Source-change warnings remain visible failures.
+backup:
+    sudo bash ./sys_backup.sh
 
-# Remove a stopped container. The host report directory is preserved.
-remove:
-    sudo docker rm "{{container}}"
+# Show available archive filenames and private permissions.
+backup-list:
+    sudo ls -lh /var/backups/phase-03/
+
+# List a specific archive's members for later submission evidence.
+backup-contents archive:
+    sudo tar -tvf {{quote(archive)}}
+
+# Watch live tar/gzip process niceness in a second Ubuntu SSH terminal.
+backup-priority:
+    watch -n 0.5 'ps -C tar,gzip -o pid,ppid,ni,comm,args'
+
+# Backup output includes worker PID and actual nice value for later screenshots.
+backup-demo: backup backup-list

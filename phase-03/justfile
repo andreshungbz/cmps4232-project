@@ -108,7 +108,7 @@ net-test:
     bash -n ./test_net_check.sh
     bash ./test_net_check.sh
 
-# Run diagnostics. Exit 1 means findings were published; exit 2 remains a failure.
+# Run diagnostics script to publish a report of findings.
 net-check:
     sudo bash ./net_check.sh
 

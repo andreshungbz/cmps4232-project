@@ -264,6 +264,6 @@ pass 'Readable command quotes preserve spaces, apostrophes, wildcards, and liter
 # Check the generated structure without relying on browser regrouping.
 [[ $(grep -c '<div class="check-group">' "$TEST_DIR/healthy.html") == 5 ]] || fail 'Category count.'
 [[ $(grep -c '<details class="check"' "$TEST_DIR/healthy.html") == 13 ]] || fail 'Check count.'
-grep -q '<summary>Active Network Sockets — PASS</summary>' "$TEST_DIR/healthy.html" || fail 'Short title missing.'
+grep -q '<summary>Active Network Sockets - PASS</summary>' "$TEST_DIR/healthy.html" || fail 'Short title missing.'
 if grep -q 'HostConfig.PortBindings' "$TEST_DIR/healthy.html"; then fail 'Duplicate port check remains.'; fi
 pass 'Five categories and thirteen descriptive checks are generated directly.'
